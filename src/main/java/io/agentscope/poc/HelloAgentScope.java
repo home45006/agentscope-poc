@@ -10,9 +10,14 @@ import io.agentscope.core.tool.Toolkit;
 public class HelloAgentScope {
 
     public static void main(String[] args) {
-        String apiKey = System.getenv("DASHSCOPE_API_KEY");
+        String apiKey = loadApiKey();
+
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("请设置环境变量 DASHSCOPE_API_KEY");
+            throw new IllegalStateException(
+                "请配置 DASHSCOPE_API_KEY：\n" +
+                "  1. 在 config.properties 中设置 dashscope.api.key\n" +
+                "  2. 或设置环境变量 DASHSCOPE_API_KEY"
+            );
         }
 
         // 注册工具
@@ -37,6 +42,25 @@ public class HelloAgentScope {
 
         Msg response = agent.call(msg).block();
         System.out.println("Jarvis: " + response.getTextContent());
+    }
+
+    private static String loadApiKey() {
+        // 1. 优先读 config.properties（项目根目录）
+        java.io.File configFile = new java.io.File("config.properties");
+        if (configFile.exists()) {
+            try (java.io.InputStream in = new java.io.FileInputStream(configFile)) {
+                java.util.Properties props = new java.util.Properties();
+                props.load(in);
+                String key = props.getProperty("dashscope.api.key");
+                if (key != null && !key.isBlank()) {
+                    return key;
+                }
+            } catch (java.io.IOException e) {
+                System.err.println("读取 config.properties 失败: " + e.getMessage());
+            }
+        }
+        // 2. 回退到环境变量
+        return System.getenv("DASHSCOPE_API_KEY");
     }
 }
 
