@@ -2,6 +2,7 @@ package io.agentscope.poc.tool;
 
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
+import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.model.CarCommand;
 
 import java.util.HashMap;
@@ -27,6 +28,15 @@ public class VehicleTools {
         cmd.action = "control_ac";
         cmd.params = params;
         cmd.tts = buildAcTts(action, temperature, fanLevel);
+
+        // 注册指令到 CommandRegistry
+        Map<String, Object> command = new HashMap<>();
+        command.put("domain", "vehicle");
+        command.put("action", "control_ac");
+        command.put("params", params);
+        command.put("tts", cmd.tts);
+        CommandRegistry.register(command);
+
         return cmd;
     }
 

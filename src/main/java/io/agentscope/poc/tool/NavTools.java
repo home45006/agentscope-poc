@@ -2,6 +2,7 @@ package io.agentscope.poc.tool;
 
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
+import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.model.NavCommand;
 
 import java.util.HashMap;
@@ -27,6 +28,8 @@ public class NavTools {
         cmd.action = "start_navigation";
         cmd.params = params;
         cmd.tts = "为您导航至" + destination;
+
+        registerCommand("navigation", cmd);
         return cmd;
     }
 
@@ -40,6 +43,8 @@ public class NavTools {
         cmd.action = "add_waypoint";
         cmd.params = params;
         cmd.tts = "已添加途经" + waypoint;
+
+        registerCommand("navigation", cmd);
         return cmd;
     }
 
@@ -53,6 +58,8 @@ public class NavTools {
         cmd.action = "change_destination";
         cmd.params = params;
         cmd.tts = "已改去" + newDestination;
+
+        registerCommand("navigation", cmd);
         return cmd;
     }
 
@@ -66,6 +73,8 @@ public class NavTools {
         cmd.action = "search_along_route";
         cmd.params = params;
         cmd.tts = "为您搜索途中" + translatePoiType(poiType);
+
+        registerCommand("navigation", cmd);
         return cmd;
     }
 
@@ -75,7 +84,18 @@ public class NavTools {
         cmd.action = "cancel_navigation";
         cmd.params = Map.of();
         cmd.tts = "已取消导航";
+
+        registerCommand("navigation", cmd);
         return cmd;
+    }
+
+    private void registerCommand(String domain, NavCommand cmd) {
+        Map<String, Object> command = new HashMap<>();
+        command.put("domain", domain);
+        command.put("action", cmd.action);
+        command.put("params", cmd.params);
+        command.put("tts", cmd.tts);
+        CommandRegistry.register(command);
     }
 
     private String translatePoiType(String poiType) {

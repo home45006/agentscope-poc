@@ -1,15 +1,21 @@
 package io.agentscope.poc;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.poc.config.ModelConfig;
+import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.router.RouterAgentFactory;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 public class XiaoAnApplication {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static void main(String[] args) {
         String apiKey = ModelConfig.loadApiKey();
@@ -26,7 +32,7 @@ public class XiaoAnApplication {
 
         // 检查命令行参数
         if (args.length > 0 && "--interactive".equals(args[0])) {
-            runInteractiveMode(xiaoAn);
+            runInteractiveMode(xiaoAn, userId);
         } else {
             runDemoMode(xiaoAn);
         }
@@ -37,7 +43,7 @@ public class XiaoAnApplication {
     /**
      * 交互模式：用户通过命令行与小安实时对话
      */
-    private static void runInteractiveMode(ReActAgent xiaoAn) {
+    private static void runInteractiveMode(ReActAgent xiaoAn, String userId) {
         System.out.println("╔════════════════════════════════════════════╗");
         System.out.println("║  小安 · 长安汽车专属智能助手              ║");
         System.out.println("║  ────────────────────────────────────────  ║");
@@ -61,6 +67,10 @@ public class XiaoAnApplication {
                 break;
             }
 
+            // 清空上一次的指令缓存
+            CommandRegistry.clear();
+            CommandRegistry.setSessionId(userId);
+
             Msg msg = Msg.builder()
                     .role(MsgRole.USER)
                     .textContent(userInput)
@@ -69,6 +79,22 @@ public class XiaoAnApplication {
             System.out.print("小安: ");
             Msg response = xiaoAn.call(msg).block();
             System.out.println(response.getTextContent());
+
+            // 输出捕获的结构化指令
+            List<Map<String, Object>> commands = CommandRegistry.getCommands();
+            if (!commands.isEmpty()) {
+                System.out.println();
+                System.out.println("┌─────────── 下发指令 ──────────┐");
+                for (int i = 0; i < commands.size(); i++) {
+                    try {
+                        String json = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(commands.get(i));
+                        System.out.println("│ [" + (i + 1) + "] " + json.replace("\n", "\n│   ").trim());
+                    } catch (Exception e) {
+                        System.out.println("│ [" + (i + 1) + "] " + commands.get(i));
+                    }
+                }
+                System.out.println("└───────────────────────────────────┘");
+            }
             System.out.println();
         }
 
@@ -101,11 +127,18 @@ public class XiaoAnApplication {
 
     private static void sendAndPrint(ReActAgent agent, String userInput) {
         System.out.println("\n用户: " + userInput);
+        CommandRegistry.clear();
+        CommandRegistry.setSessionId("demo");
         Msg msg = Msg.builder()
                 .role(MsgRole.USER)
                 .textContent(userInput)
                 .build();
         Msg response = agent.call(msg).block();
         System.out.println("小安: " + response.getTextContent());
+
+        List<Map<String, Object>> commands = CommandRegistry.getCommands();
+        if (!commands.isEmpty()) {
+            System.out.println("下发指令: " + commands);
+        }
     }
 }

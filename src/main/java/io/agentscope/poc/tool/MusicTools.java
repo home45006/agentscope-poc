@@ -2,6 +2,7 @@ package io.agentscope.poc.tool;
 
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
+import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.model.MusicCommand;
 
 import java.util.HashMap;
@@ -21,6 +22,8 @@ public class MusicTools {
         cmd.action = "play_music";
         cmd.params = params;
         cmd.tts = "好的小安为您播放" + query;
+
+        registerCommand("music", cmd);
         return cmd;
     }
 
@@ -34,6 +37,8 @@ public class MusicTools {
         cmd.action = "control_playback";
         cmd.params = params;
         cmd.tts = buildPlaybackTts(action);
+
+        registerCommand("music", cmd);
         return cmd;
     }
 
@@ -49,6 +54,8 @@ public class MusicTools {
         cmd.action = "adjust_volume";
         cmd.params = params;
         cmd.tts = buildVolumeTts(action, value);
+
+        registerCommand("music", cmd);
         return cmd;
     }
 
@@ -62,7 +69,18 @@ public class MusicTools {
         cmd.action = "set_play_mode";
         cmd.params = params;
         cmd.tts = buildModeTts(mode);
+
+        registerCommand("music", cmd);
         return cmd;
+    }
+
+    private void registerCommand(String domain, MusicCommand cmd) {
+        Map<String, Object> command = new HashMap<>();
+        command.put("domain", domain);
+        command.put("action", cmd.action);
+        command.put("params", cmd.params);
+        command.put("tts", cmd.tts);
+        CommandRegistry.register(command);
     }
 
     private String buildPlaybackTts(String action) {

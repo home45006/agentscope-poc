@@ -12,8 +12,10 @@ import io.agentscope.poc.agent.MusicAgent;
 import io.agentscope.poc.agent.NavAgent;
 import io.agentscope.poc.agent.QAAgent;
 import io.agentscope.poc.agent.VehicleAgent;
+import io.agentscope.poc.hook.CommandCaptureHook;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -80,6 +82,7 @@ public class RouterAgentFactory {
                     .model(model)
                     .memory(memory)
                     .toolkit(toolkit)
+                    .hooks(List.of(new CommandCaptureHook()))
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("初始化小安 RouterAgent 失败", e);
