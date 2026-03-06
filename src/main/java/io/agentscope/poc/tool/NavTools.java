@@ -1,8 +1,8 @@
 package io.agentscope.poc.tool;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
-import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.model.NavCommand;
 
 import java.util.HashMap;
@@ -10,12 +10,14 @@ import java.util.Map;
 
 /**
  * 导航工具类。
- * 提供导航相关的工具方法，供导航专家 Agent 调用。
+ * 返回 JSON 字符串格式以便捕获。
  */
 public class NavTools {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     @Tool(name = "start_navigation", description = "规划导航路线：目的地名称或地址")
-    public NavCommand startNavigation(
+    public String startNavigation(
             @ToolParam(name = "destination", description = "目的地名称或地址") String destination,
             @ToolParam(name = "preference", description = "路线偏好：fastest/shortest/avoid_toll/avoid_highway") String preference) {
         Map<String, Object> params = new HashMap<>();
@@ -29,12 +31,11 @@ public class NavTools {
         cmd.params = params;
         cmd.tts = "为您导航至" + destination;
 
-        registerCommand("navigation", cmd);
-        return cmd;
+        return toJson("navigation", cmd);
     }
 
     @Tool(name = "add_waypoint", description = "添加途经点")
-    public NavCommand addWaypoint(
+    public String addWaypoint(
             @ToolParam(name = "waypoint", description = "途经点名称或地址") String waypoint) {
         Map<String, Object> params = new HashMap<>();
         params.put("waypoint", waypoint);
@@ -44,12 +45,11 @@ public class NavTools {
         cmd.params = params;
         cmd.tts = "已添加途经" + waypoint;
 
-        registerCommand("navigation", cmd);
-        return cmd;
+        return toJson("navigation", cmd);
     }
 
     @Tool(name = "change_destination", description = "修改目的地")
-    public NavCommand changeDestination(
+    public String changeDestination(
             @ToolParam(name = "new_destination", description = "新目的地名称或地址") String newDestination) {
         Map<String, Object> params = new HashMap<>();
         params.put("destination", newDestination);
@@ -59,12 +59,11 @@ public class NavTools {
         cmd.params = params;
         cmd.tts = "已改去" + newDestination;
 
-        registerCommand("navigation", cmd);
-        return cmd;
+        return toJson("navigation", cmd);
     }
 
     @Tool(name = "search_along_route", description = "查询途中信息：油站/充电站/停车场/服务区")
-    public NavCommand searchAlongRoute(
+    public String searchAlongRoute(
             @ToolParam(name = "poi_type", description = "POI类型：gas_station/charging_station/parking/service_area") String poiType) {
         Map<String, Object> params = new HashMap<>();
         params.put("poi_type", poiType);
@@ -74,28 +73,30 @@ public class NavTools {
         cmd.params = params;
         cmd.tts = "为您搜索途中" + translatePoiType(poiType);
 
-        registerCommand("navigation", cmd);
-        return cmd;
+        return toJson("navigation", cmd);
     }
 
     @Tool(name = "cancel_navigation", description = "取消导航")
-    public NavCommand cancelNavigation() {
+    public String cancelNavigation() {
         NavCommand cmd = new NavCommand();
         cmd.action = "cancel_navigation";
         cmd.params = Map.of();
         cmd.tts = "已取消导航";
 
-        registerCommand("navigation", cmd);
-        return cmd;
+        return toJson("navigation", cmd);
     }
 
-    private void registerCommand(String domain, NavCommand cmd) {
-        Map<String, Object> command = new HashMap<>();
-        command.put("domain", domain);
-        command.put("action", cmd.action);
-        command.put("params", cmd.params);
-        command.put("tts", cmd.tts);
-        CommandRegistry.register(command);
+    private String toJson(String domain, NavCommand cmd) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            result.put("domain", domain);
+            result.put("action", cmd.action);
+            result.put("params", cmd.params);
+            result.put("tts", cmd.tts);
+            return MAPPER.writeValueAsString(result);
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
     }
 
     private String translatePoiType(String poiType) {

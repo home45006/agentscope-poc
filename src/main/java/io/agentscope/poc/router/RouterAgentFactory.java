@@ -34,7 +34,15 @@ public class RouterAgentFactory {
             - 音乐播放与控制 → 必须调用 call_music_agent
             - 导航与路线规划 → 必须调用 call_nav_agent
             - 知识问答 → 必须调用 call_qa_agent
-            每次响应前必须先调用至少一个工具。
+
+            重要：调用工具后会返回 JSON 格式的指令，你必须：
+            1. 从工具返回结果中提取 JSON 内容
+            2. 将 JSON 指令附加在你的自然语言回复后面，格式：[[JSON_START]]...[[JSON_END]]
+            3. 这样可以帮助调试和验证系统是否正确生成了指令
+
+            示例：
+            用户：把空调调到25度
+            你：好的，已为您将空调调至25度。[[JSON_START]]{"domain":"vehicle","action":"control_ac","params":{"action":"set_temperature","temperature":25},"tts":"好的，已为您将空调调至25度"}[[JSON_END]]
             """;
 
     private RouterAgentFactory() {

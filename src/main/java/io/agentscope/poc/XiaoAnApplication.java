@@ -5,17 +5,23 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.poc.config.ModelConfig;
-import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.router.RouterAgentFactory;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class XiaoAnApplication {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Pattern JSON_PATTERN = Pattern.compile(
+            "\\[\\[JSON_START\\]\\](.*?)\\[\\[JSON_END\\]\\]",
+            Pattern.DOTALL
+    );
 
     public static void main(String[] args) {
         String apiKey = ModelConfig.loadApiKey();
@@ -30,7 +36,6 @@ public class XiaoAnApplication {
         String userId = "user_001";
         ReActAgent xiaoAn = RouterAgentFactory.build(ModelConfig.defaultModel(), userId);
 
-        // 检查命令行参数
         if (args.length > 0 && "--interactive".equals(args[0])) {
             runInteractiveMode(xiaoAn, userId);
         } else {
@@ -40,9 +45,6 @@ public class XiaoAnApplication {
         Schedulers.shutdownNow();
     }
 
-    /**
-     * 交互模式：用户通过命令行与小安实时对话
-     */
     private static void runInteractiveMode(ReActAgent xiaoAn, String userId) {
         System.out.println("╔════════════════════════════════════════════╗");
         System.out.println("║  小安 · 长安汽车专属智能助手              ║");
@@ -67,10 +69,6 @@ public class XiaoAnApplication {
                 break;
             }
 
-            // 清空上一次的指令缓存
-            CommandRegistry.clear();
-            CommandRegistry.setSessionId(userId);
-
             Msg msg = Msg.builder()
                     .role(MsgRole.USER)
                     .textContent(userInput)
@@ -78,11 +76,18 @@ public class XiaoAnApplication {
 
             System.out.print("小安: ");
             Msg response = xiaoAn.call(msg).block();
-            System.out.println(response.getTextContent());
+            String responseText = response.getTextContent();
 
-            // 输出捕获的结构化指令
-            List<Map<String, Object>> commands = CommandRegistry.getCommands();
+            // 提取 JSON 指令
+            List<Map<String, Object>> commands = extractCommands(responseText);
+            String plainText = responseText;
+
             if (!commands.isEmpty()) {
+                // 移除 JSON 部分，只显示自然语言回复
+                plainText = responseText.replaceAll("\\n?\\[\\[JSON_START\\]\\].*?\\[\\[JSON_END\\]\\]\\n?", "");
+                System.out.println(plainText.trim());
+
+                // 显示结构化指令
                 System.out.println();
                 System.out.println("┌─────────── 下发指令 ──────────┐");
                 for (int i = 0; i < commands.size(); i++) {
@@ -94,6 +99,8 @@ public class XiaoAnApplication {
                     }
                 }
                 System.out.println("└───────────────────────────────────┘");
+            } else {
+                System.out.println(responseText);
             }
             System.out.println();
         }
@@ -101,44 +108,52 @@ public class XiaoAnApplication {
         scanner.close();
     }
 
-    /**
-     * 演示模式：运行预设的测试场景
-     */
+    private static List<Map<String, Object>> extractCommands(String text) {
+        List<Map<String, Object>> commands = new ArrayList<>();
+        Matcher matcher = JSON_PATTERN.matcher(text);
+
+        while (matcher.find()) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> cmd = MAPPER.readValue(matcher.group(1), Map.class);
+                commands.add(cmd);
+            } catch (Exception e) {
+                // 忽略解析错误
+            }
+        }
+        return commands;
+    }
+
     private static void runDemoMode(ReActAgent xiaoAn) {
         System.out.println("════════════════════════════════════════════");
         System.out.println("  小安演示模式（使用 --interactive 进入交互模式）");
         System.out.println("════════════════════════════════════════════");
 
-        // 测试场景 1：车控
         sendAndPrint(xiaoAn, "把空调调到22度");
-
-        // 测试场景 2：域内追问
         sendAndPrint(xiaoAn, "再低2度");
-
-        // 测试场景 3：音乐
         sendAndPrint(xiaoAn, "播放一首周杰伦的歌");
-
-        // 测试场景 4：跨域
         sendAndPrint(xiaoAn, "同时打开车窗，并且导航去重庆解放碑");
-
-        // 测试场景 5：知识问答
         sendAndPrint(xiaoAn, "长安CS75多久保养一次");
     }
 
     private static void sendAndPrint(ReActAgent agent, String userInput) {
         System.out.println("\n用户: " + userInput);
-        CommandRegistry.clear();
-        CommandRegistry.setSessionId("demo");
         Msg msg = Msg.builder()
                 .role(MsgRole.USER)
                 .textContent(userInput)
                 .build();
         Msg response = agent.call(msg).block();
-        System.out.println("小安: " + response.getTextContent());
+        String responseText = response.getTextContent();
 
-        List<Map<String, Object>> commands = CommandRegistry.getCommands();
+        List<Map<String, Object>> commands = extractCommands(responseText);
+        String plainText = responseText;
+
         if (!commands.isEmpty()) {
+            plainText = responseText.replaceAll("\\n?\\[\\[JSON_START\\]\\].*?\\[\\[JSON_END\\]\\]\\n?", "");
+            System.out.println("小安: " + plainText.trim());
             System.out.println("下发指令: " + commands);
+        } else {
+            System.out.println("小安: " + responseText);
         }
     }
 }

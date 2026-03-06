@@ -5,13 +5,9 @@ import io.agentscope.core.hook.Hook;
 import io.agentscope.core.hook.HookEvent;
 import io.agentscope.core.hook.PostActingEvent;
 import io.agentscope.core.message.TextBlock;
-import io.agentscope.poc.model.CarCommand;
-import io.agentscope.poc.model.MusicCommand;
-import io.agentscope.poc.model.NavCommand;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +30,7 @@ public class CommandCaptureHook implements Hook {
             // 获取工具名称
             String toolName = e.getToolUse().getName();
 
-            // 从工具返回结果中提取结构化指令
+            // 从工具返回结果中提取 JSON
             String resultText = e.getToolResult().getOutput().stream()
                     .filter(block -> block instanceof TextBlock)
                     .map(block -> ((TextBlock) block).getText())
@@ -46,64 +42,14 @@ public class CommandCaptureHook implements Hook {
                     // 尝试解析为 JSON
                     Map<String, Object> command = MAPPER.readValue(resultText, Map.class);
                     if (isValidCommand(command)) {
-                        // 添加领域信息
-                        addDomainInfo(command, toolName);
                         COMMANDS.get().add(command);
                     }
                 } catch (Exception ex) {
-                    // 不是 JSON 格式，尝试解析为简单文本
-                    if (resultText.contains("action=") || resultText.contains("tts=")) {
-                        Map<String, Object> simpleCmd = parseSimpleFormat(resultText, toolName);
-                        if (simpleCmd != null) {
-                            COMMANDS.get().add(simpleCmd);
-                        }
-                    }
+                    // 不是 JSON 格式，忽略
                 }
             }
         }
         return Mono.just(event);
-    }
-
-    /**
-     * 根据工具名称添加领域信息
-     */
-    private void addDomainInfo(Map<String, Object> command, String toolName) {
-        if (command != null && !command.containsKey("domain")) {
-            if (toolName != null) {
-                if (toolName.contains("vehicle")) {
-                    command.put("domain", "vehicle");
-                } else if (toolName.contains("music")) {
-                    command.put("domain", "music");
-                } else if (toolName.contains("nav")) {
-                    command.put("domain", "navigation");
-                } else if (toolName.contains("qa")) {
-                    command.put("domain", "qa");
-                }
-            }
-        }
-    }
-
-    /**
-     * 解析简单格式的输出（如 toString() 格式）
-     */
-    private Map<String, Object> parseSimpleFormat(String text, String toolName) {
-        Map<String, Object> cmd = new HashMap<>();
-        addDomainInfo(cmd, toolName);
-
-        // 尝试从文本中提取关键信息
-        if (text.contains("空调") || text.contains("温度")) {
-            cmd.put("action", "control_ac");
-            cmd.put("domain", "vehicle");
-        } else if (text.contains("播放") || text.contains("音乐")) {
-            cmd.put("action", "play_music");
-            cmd.put("domain", "music");
-        } else if (text.contains("导航")) {
-            cmd.put("action", "start_navigation");
-            cmd.put("domain", "navigation");
-        }
-
-        cmd.put("raw_output", text);
-        return cmd.isEmpty() ? null : cmd;
     }
 
     /**

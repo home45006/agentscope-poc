@@ -1,8 +1,8 @@
 package io.agentscope.poc.tool;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
-import io.agentscope.poc.hook.CommandRegistry;
 import io.agentscope.poc.model.MusicCommand;
 
 import java.util.HashMap;
@@ -10,8 +10,10 @@ import java.util.Map;
 
 public class MusicTools {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     @Tool(name = "play_music", description = "播放音乐：歌曲名、歌手、风格、心情等")
-    public MusicCommand playMusic(
+    public String playMusic(
             @ToolParam(name = "query", description = "搜索关键词：歌曲名/歌手/风格/心情") String query,
             @ToolParam(name = "query_type", description = "查询类型：song/artist/genre/mood") String queryType) {
         Map<String, Object> params = new HashMap<>();
@@ -23,12 +25,11 @@ public class MusicTools {
         cmd.params = params;
         cmd.tts = "好的小安为您播放" + query;
 
-        registerCommand("music", cmd);
-        return cmd;
+        return toJson("music", cmd);
     }
 
     @Tool(name = "control_playback", description = "控制播放：暂停、继续、上一首、下一首")
-    public MusicCommand controlPlayback(
+    public String controlPlayback(
             @ToolParam(name = "action", description = "操作：pause/resume/next/previous") String action) {
         Map<String, Object> params = new HashMap<>();
         params.put("action", action);
@@ -38,12 +39,11 @@ public class MusicTools {
         cmd.params = params;
         cmd.tts = buildPlaybackTts(action);
 
-        registerCommand("music", cmd);
-        return cmd;
+        return toJson("music", cmd);
     }
 
     @Tool(name = "adjust_volume", description = "调节音量：增大、减小、设置为指定值")
-    public MusicCommand adjustVolume(
+    public String adjustVolume(
             @ToolParam(name = "action", description = "操作：up/down/set") String action,
             @ToolParam(name = "value", description = "音量值（0-100），仅 set 时有效") Integer value) {
         Map<String, Object> params = new HashMap<>();
@@ -55,12 +55,11 @@ public class MusicTools {
         cmd.params = params;
         cmd.tts = buildVolumeTts(action, value);
 
-        registerCommand("music", cmd);
-        return cmd;
+        return toJson("music", cmd);
     }
 
     @Tool(name = "set_play_mode", description = "切换播放模式：随机、单曲循环、顺序")
-    public MusicCommand setPlayMode(
+    public String setPlayMode(
             @ToolParam(name = "mode", description = "模式：shuffle/repeat_one/sequence") String mode) {
         Map<String, Object> params = new HashMap<>();
         params.put("mode", mode);
@@ -70,17 +69,20 @@ public class MusicTools {
         cmd.params = params;
         cmd.tts = buildModeTts(mode);
 
-        registerCommand("music", cmd);
-        return cmd;
+        return toJson("music", cmd);
     }
 
-    private void registerCommand(String domain, MusicCommand cmd) {
-        Map<String, Object> command = new HashMap<>();
-        command.put("domain", domain);
-        command.put("action", cmd.action);
-        command.put("params", cmd.params);
-        command.put("tts", cmd.tts);
-        CommandRegistry.register(command);
+    private String toJson(String domain, MusicCommand cmd) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            result.put("domain", domain);
+            result.put("action", cmd.action);
+            result.put("params", cmd.params);
+            result.put("tts", cmd.tts);
+            return MAPPER.writeValueAsString(result);
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
     }
 
     private String buildPlaybackTts(String action) {
