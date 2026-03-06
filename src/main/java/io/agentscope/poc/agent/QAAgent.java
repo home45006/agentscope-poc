@@ -2,7 +2,7 @@ package io.agentscope.poc.agent;
 
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.InMemoryMemory;
-import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.tool.Toolkit;
@@ -22,11 +22,11 @@ public class QAAgent {
     /**
      * 构建问答专家 Agent。
      *
-     * @param model    DashScope 聊天模型
+     * @param model    聊天模型（DashScopeChatModel / OpenAIChatModel 均可）
      * @param skillRepo Skill 仓库
      * @return 配置好的 ReActAgent 实例
      */
-    public static ReActAgent build(DashScopeChatModel model,
+    public static ReActAgent build(ChatModelBase model,
                                    ClasspathSkillRepository skillRepo) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new QATools());

@@ -3,7 +3,7 @@ package io.agentscope.poc.router;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.autocontext.AutoContextConfig;
 import io.agentscope.core.memory.autocontext.AutoContextMemory;
-import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.core.session.JsonSession;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.tool.Toolkit;
@@ -13,6 +13,7 @@ import io.agentscope.poc.agent.NavAgent;
 import io.agentscope.poc.agent.QAAgent;
 import io.agentscope.poc.agent.VehicleAgent;
 import io.agentscope.poc.hook.CommandCaptureHook;
+import io.agentscope.poc.hook.LoggingHook;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -23,12 +24,23 @@ import java.util.function.Supplier;
  *
  * <p>创建小安 RouterAgent，将 4 个领域专家 Agent 注册为 SubAgent Tool，
  * 使用 AutoContextMemory 管理全局多轮对话。
+ *
+ * <p>包含拒识能力：当用户输入无实际意义时，直接返回兜底回复，不调用任何工具。
  */
 public class RouterAgentFactory {
 
     private static final String SYS_PROMPT = """
             你是小安，长安汽车的专属智能车载助手，专业、亲切、有温度。
-            你必须通过调用工具来完成任务，不能直接生成响应。
+
+            【拒识规则 - 优先判断】
+            如果用户的输入属于以下任何一种情况，不要调用任何工具，直接回复兜底语：
+            1. 乱码、随机字符、无意义符号（如："asdfgh"、"123!!!@@@"、"㊙️㊙️"）
+            2. 内容极短且无法理解语义（单个字符、纯数字等）
+            3. 与汽车、驾驶、出行完全无关且无法作为通用知识回答的内容
+            兜底回复格式：「小安没有听清楚，您可以说"调空调""播音乐""去导航"或者问我长安汽车相关问题」
+
+            【正常工作规则】
+            对于可理解的用户需求，必须通过调用工具来完成任务，不能直接生成响应。
             当用户提出任何需求时，你必须调用对应的专家 Agent 工具：
             - 车辆控制（空调、车窗、座椅、车灯、车门）→ 必须调用 call_vehicle_agent
             - 音乐播放与控制 → 必须调用 call_music_agent
@@ -52,11 +64,11 @@ public class RouterAgentFactory {
     /**
      * 构建小安 RouterAgent。
      *
-     * @param model  DashScope 聊天模型
+     * @param model  聊天模型（DashScopeChatModel / OpenAIChatModel 均可）
      * @param userId 用户标识，用于会话隔离
      * @return 配置好的 ReActAgent 实例
      */
-    public static ReActAgent build(DashScopeChatModel model, String userId) {
+    public static ReActAgent build(ChatModelBase model, String userId) {
         ClasspathSkillRepository skillRepo;
         try {
             skillRepo = new ClasspathSkillRepository("skills");
@@ -96,7 +108,7 @@ public class RouterAgentFactory {
                     .model(model)
                     .memory(memory)
                     .toolkit(toolkit)
-                    .hooks(List.of(new CommandCaptureHook()))
+                    .hooks(List.of(new LoggingHook(), new CommandCaptureHook()))
                     .build();
         } catch (Exception e) {
             try { skillRepo.close(); } catch (Exception ignored) {}
@@ -112,7 +124,6 @@ public class RouterAgentFactory {
                 .description(description)
                 .session(new JsonSession(Path.of("./sessions")))
                 .build();
-        // session_id 在实际调用时由框架按 userId_domain 命名
         toolkit.registration()
                 .subAgent(factory::get, config)
                 .apply();

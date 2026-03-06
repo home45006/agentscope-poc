@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
+import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.poc.config.ModelConfig;
 import io.agentscope.poc.router.RouterAgentFactory;
+import io.agentscope.poc.util.AppLogger;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
@@ -27,14 +29,21 @@ public class XiaoAnApplication {
         String apiKey = ModelConfig.loadApiKey();
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException(
-                "请配置 DASHSCOPE_API_KEY：\n" +
-                "  1. 在 config.properties 中设置 dashscope.api.key\n" +
-                "  2. 或设置环境变量 DASHSCOPE_API_KEY"
+                "请配置 API Key：\n" +
+                "  dashscope: config.properties 中设置 dashscope.api.key 或环境变量 DASHSCOPE_API_KEY\n" +
+                "  glm:       config.properties 中设置 glm.api.key 或环境变量 GLM_API_KEY\n" +
+                "  minimax:   config.properties 中设置 minimax.api.key 或环境变量 MINIMAX_API_KEY"
             );
         }
 
+        String provider = ModelConfig.currentProvider();
+        AppLogger.logSystem("启动小安，模型提供商: " + provider);
+
         String userId = "user_001";
-        ReActAgent xiaoAn = RouterAgentFactory.build(ModelConfig.defaultModel(), userId);
+        ChatModelBase model = ModelConfig.buildModel();
+        ReActAgent xiaoAn = RouterAgentFactory.build(model, userId);
+
+        AppLogger.logSystem("小安 RouterAgent 初始化完成");
 
         if (args.length > 0 && "--interactive".equals(args[0])) {
             runInteractiveMode(xiaoAn, userId);
@@ -42,6 +51,7 @@ public class XiaoAnApplication {
             runDemoMode(xiaoAn);
         }
 
+        AppLogger.logSystem("小安会话结束");
         Schedulers.shutdownNow();
     }
 
@@ -66,8 +76,11 @@ public class XiaoAnApplication {
 
             if ("quit".equalsIgnoreCase(userInput) || "exit".equalsIgnoreCase(userInput)) {
                 System.out.println("\n小安: 再见，随时为您服务！");
+                AppLogger.logSystem("用户主动退出");
                 break;
             }
+
+            AppLogger.logUserInput(userInput);
 
             Msg msg = Msg.builder()
                     .role(MsgRole.USER)
@@ -77,6 +90,8 @@ public class XiaoAnApplication {
             System.out.print("小安: ");
             Msg response = xiaoAn.call(msg).block();
             String responseText = response.getTextContent();
+
+            AppLogger.logAgentOutput("小安", responseText);
 
             // 提取 JSON 指令
             List<Map<String, Object>> commands = extractCommands(responseText);
@@ -138,12 +153,16 @@ public class XiaoAnApplication {
 
     private static void sendAndPrint(ReActAgent agent, String userInput) {
         System.out.println("\n用户: " + userInput);
+        AppLogger.logUserInput(userInput);
+
         Msg msg = Msg.builder()
                 .role(MsgRole.USER)
                 .textContent(userInput)
                 .build();
         Msg response = agent.call(msg).block();
         String responseText = response.getTextContent();
+
+        AppLogger.logAgentOutput("小安", responseText);
 
         List<Map<String, Object>> commands = extractCommands(responseText);
         String plainText = responseText;

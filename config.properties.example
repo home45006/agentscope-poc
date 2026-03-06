@@ -1,1 +1,27 @@
-dashscope.api.key=sk-your-api-key-here
+# ============================================================
+# 小安 · 模型配置示例
+# 复制此文件为 config.properties，填入对应的 API Key
+# ============================================================
+
+# 切换模型提供商: dashscope | glm | minimax
+model.provider=dashscope
+
+# ── DashScope（千问/Qwen）──────────────────────────────────
+# 获取 Key: https://bailian.console.aliyun.com/
+# 或设置环境变量: DASHSCOPE_API_KEY
+dashscope.api.key=your-dashscope-api-key
+dashscope.model.name=qwen-plus
+
+# ── GLM（智谱 AI）──────────────────────────────────────────
+# 获取 Key: https://open.bigmodel.cn/
+# 或设置环境变量: GLM_API_KEY
+# 使用 OpenAI 兼容接口: https://open.bigmodel.cn/api/paas/v4
+glm.api.key=your-glm-api-key
+glm.model.name=glm-4-flash
+
+# ── MiniMax ────────────────────────────────────────────────
+# 获取 Key: https://platform.minimaxi.com/
+# 或设置环境变量: MINIMAX_API_KEY
+# 使用 OpenAI 兼容接口: https://api.minimax.chat/v1
+minimax.api.key=your-minimax-api-key
+minimax.model.name=abab6.5s-chat
