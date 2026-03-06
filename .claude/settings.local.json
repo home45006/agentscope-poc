@@ -53,7 +53,9 @@
       "Bash(mvn clean compile 2>&1 | tail -15)",
       "Bash(mvn compile -q && echo -e \"把空调调到25度\\\\nexit\" | DASHSCOPE_API_KEY=sk-78c67100c8c747ea9c0e00a27d203794 mvn exec:java -Dexec.args=\"--interactive\" -q 2>&1)",
       "Bash(echo -e \"把空调调到25度\\\\nexit\" | DASHSCOPE_API_KEY=sk-78c67100c8c747ea9c0e00a27d203794 mvn exec:java -Dexec.args=\"--interactive\" 2>&1 | grep -E \"\\(指令|CommandRegistry|\\\\[|小安|你:\\)\")",
-      "Bash(git add -A && git status --short)"
+      "Bash(git add -A && git status --short)",
+      "Bash(mvn compile -q && echo -e \"把空调调到25度\\\\nexit\" | DASHSCOPE_API_KEY=sk-78c67100c8c747ea9c0e00a27d203794 mvn exec:java -Dexec.args=\"--interactive\" -q 2>&1 | head -25)",
+      "Bash(echo -e \"播放周杰伦的歌\\\\nexit\" | DASHSCOPE_API_KEY=sk-78c67100c8c747ea9c0e00a27d203794 mvn exec:java -Dexec.args=\"--interactive\" -q 2>&1 | head -25)"
     ]
   }
 }

@@ -28,13 +28,13 @@ public class RouterAgentFactory {
 
     private static final String SYS_PROMPT = """
             你是小安，长安汽车的专属智能车载助手，专业、亲切、有温度。
-            你负责理解用户的语音指令，调用对应专家能力完成任务。
-            - 车辆控制（空调、车窗、座椅、车灯、车门）→ call_vehicle_agent
-            - 音乐播放与控制 → call_music_agent
-            - 导航与路线规划 → call_nav_agent
-            - 知识问答 → call_qa_agent
-            支持同时处理多个领域的指令。
-            最终 tts 回复使用简短口语，不超过20字，避免复杂标点。
+            你必须通过调用工具来完成任务，不能直接生成响应。
+            当用户提出任何需求时，你必须调用对应的专家 Agent 工具：
+            - 车辆控制（空调、车窗、座椅、车灯、车门）→ 必须调用 call_vehicle_agent
+            - 音乐播放与控制 → 必须调用 call_music_agent
+            - 导航与路线规划 → 必须调用 call_nav_agent
+            - 知识问答 → 必须调用 call_qa_agent
+            每次响应前必须先调用至少一个工具。
             """;
 
     private RouterAgentFactory() {
@@ -49,7 +49,13 @@ public class RouterAgentFactory {
      * @return 配置好的 ReActAgent 实例
      */
     public static ReActAgent build(DashScopeChatModel model, String userId) {
-        try (ClasspathSkillRepository skillRepo = new ClasspathSkillRepository("skills")) {
+        ClasspathSkillRepository skillRepo;
+        try {
+            skillRepo = new ClasspathSkillRepository("skills");
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("初始化 Skill 仓库失败", e);
+        }
+        try {
             Toolkit toolkit = new Toolkit();
 
             registerExpert(toolkit, "call_vehicle_agent",
@@ -85,6 +91,7 @@ public class RouterAgentFactory {
                     .hooks(List.of(new CommandCaptureHook()))
                     .build();
         } catch (Exception e) {
+            try { skillRepo.close(); } catch (Exception ignored) {}
             throw new RuntimeException("初始化小安 RouterAgent 失败", e);
         }
     }
