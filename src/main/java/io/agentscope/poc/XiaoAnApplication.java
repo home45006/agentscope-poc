@@ -10,10 +10,17 @@ import io.agentscope.poc.router.RouterAgentFactory;
 import io.agentscope.poc.util.AppLogger;
 import reactor.core.scheduler.Schedulers;
 
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
+import org.jline.reader.EndOfFileException;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -64,45 +71,98 @@ public class XiaoAnApplication {
         System.out.println("╚════════════════════════════════════════════╝");
         System.out.println();
 
-        Scanner scanner = new Scanner(System.in);
-
-        while (true) {
-            System.out.print("你: ");
-            String userInput = scanner.nextLine().trim();
-
-            if (userInput.isEmpty()) {
-                continue;
-            }
-
-            if ("quit".equalsIgnoreCase(userInput) || "exit".equalsIgnoreCase(userInput)) {
-                System.out.println("\n小安: 再见，随时为您服务！");
-                AppLogger.logSystem("用户主动退出");
-                break;
-            }
-
-            AppLogger.logUserInput(userInput);
-
-            Msg msg = Msg.builder()
-                    .role(MsgRole.USER)
-                    .textContent(userInput)
+        try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
+            LineReader lineReader = LineReaderBuilder.builder()
+                    .terminal(terminal)
                     .build();
 
+            while (true) {
+                String userInput;
+                try {
+                    userInput = lineReader.readLine("你: ").trim();
+                } catch (UserInterruptException e) {
+                    // Ctrl+C
+                    break;
+                } catch (EndOfFileException e) {
+                    // Ctrl+D
+                    break;
+                }
+
+                if (userInput.isEmpty()) {
+                    continue;
+                }
+
+                if ("quit".equalsIgnoreCase(userInput) || "exit".equalsIgnoreCase(userInput)) {
+                    System.out.println("\n小安: 再见，随时为您服务！");
+                    AppLogger.logSystem("用户主动退出");
+                    break;
+                }
+
+                AppLogger.logUserInput(userInput);
+
+                Msg msg = Msg.builder()
+                        .role(MsgRole.USER)
+                        .textContent(userInput)
+                        .build();
+
+                System.out.print("小安: ");
+                Msg response = xiaoAn.call(msg).block();
+                String responseText = response.getTextContent();
+
+                AppLogger.logAgentOutput("小安", responseText);
+
+                // 提取 JSON 指令
+                List<Map<String, Object>> commands = extractCommands(responseText);
+
+                if (!commands.isEmpty()) {
+                    // 移除 JSON 部分，只显示自然语言回复
+                    String plainText = responseText.replaceAll("\\n?\\[\\[JSON_START\\]\\].*?\\[\\[JSON_END\\]\\]\\n?", "");
+                    System.out.println(plainText.trim());
+
+                    // 显示结构化指令
+                    System.out.println();
+                    System.out.println("┌─────────── 下发指令 ──────────┐");
+                    for (int i = 0; i < commands.size(); i++) {
+                        try {
+                            String json = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(commands.get(i));
+                            System.out.println("│ [" + (i + 1) + "] " + json.replace("\n", "\n│   ").trim());
+                        } catch (Exception e) {
+                            System.out.println("│ [" + (i + 1) + "] " + commands.get(i));
+                        }
+                    }
+                    System.out.println("└───────────────────────────────────┘");
+                } else {
+                    System.out.println(responseText);
+                }
+                System.out.println();
+            }
+        } catch (IOException e) {
+            AppLogger.logSystem("终端初始化失败，降级使用标准输入: " + e.getMessage());
+            runInteractiveModeStdin(xiaoAn);
+        }
+    }
+
+    private static void runInteractiveModeStdin(ReActAgent xiaoAn) {
+        java.util.Scanner scanner = new java.util.Scanner(System.in, java.nio.charset.StandardCharsets.UTF_8);
+        while (true) {
+            System.out.print("你: ");
+            if (!scanner.hasNextLine()) break;
+            String userInput = scanner.nextLine().trim();
+            if (userInput.isEmpty()) continue;
+            if ("quit".equalsIgnoreCase(userInput) || "exit".equalsIgnoreCase(userInput)) {
+                System.out.println("\n小安: 再见，随时为您服务！");
+                break;
+            }
+            AppLogger.logUserInput(userInput);
+            Msg msg = Msg.builder().role(MsgRole.USER).textContent(userInput).build();
             System.out.print("小安: ");
             Msg response = xiaoAn.call(msg).block();
             String responseText = response.getTextContent();
-
             AppLogger.logAgentOutput("小安", responseText);
-
-            // 提取 JSON 指令
             List<Map<String, Object>> commands = extractCommands(responseText);
-            String plainText = responseText;
-
             if (!commands.isEmpty()) {
-                // 移除 JSON 部分，只显示自然语言回复
-                plainText = responseText.replaceAll("\\n?\\[\\[JSON_START\\]\\].*?\\[\\[JSON_END\\]\\]\\n?", "");
+                String plainText = responseText.replaceAll("\\n?\\[\\[JSON_START\\]\\].*?\\[\\[JSON_END\\]\\]\\n?", "");
                 System.out.println(plainText.trim());
-
-                // 显示结构化指令
                 System.out.println();
                 System.out.println("┌─────────── 下发指令 ──────────┐");
                 for (int i = 0; i < commands.size(); i++) {
@@ -119,7 +179,6 @@ public class XiaoAnApplication {
             }
             System.out.println();
         }
-
         scanner.close();
     }
 

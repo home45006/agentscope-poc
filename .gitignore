@@ -2,3 +2,4 @@ target/
 config.properties
 sessions/
 .reports/
+logs/

@@ -33,10 +33,12 @@ public class AppLogger {
             Level level = resolveLevel();
 
             // 清除 root logger 的默认 ConsoleHandler，避免控制台重复输出
+            // 同时将 root logger 级别降至 ALL，避免父级 level 拦截 FINE 消息
             Logger rootLogger = Logger.getLogger("");
             for (Handler h : rootLogger.getHandlers()) {
                 rootLogger.removeHandler(h);
             }
+            rootLogger.setLevel(Level.ALL);
 
             FileHandler fileHandler = new FileHandler(LOG_FILE, /* append= */ true);
             fileHandler.setLevel(Level.ALL);   // handler 不过滤，统一由 LOGGER 层控制
