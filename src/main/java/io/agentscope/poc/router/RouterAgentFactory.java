@@ -6,6 +6,8 @@ import io.agentscope.core.memory.autocontext.AutoContextMemory;
 import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.core.session.JsonSession;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
+import io.agentscope.core.studio.StudioClient;
+import io.agentscope.core.studio.StudioMessageHook;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.subagent.SubAgentConfig;
 import io.agentscope.poc.agent.MusicAgent;
@@ -64,11 +66,12 @@ public class RouterAgentFactory {
     /**
      * 构建小安 RouterAgent。
      *
-     * @param model  聊天模型（DashScopeChatModel / OpenAIChatModel 均可）
-     * @param userId 用户标识，用于会话隔离
+     * @param model       聊天模型（DashScopeChatModel / OpenAIChatModel 均可）
+     * @param userId      用户标识，用于会话隔离
+     * @param studioClient Studio 客户端，为 null 时不启用可视化
      * @return 配置好的 ReActAgent 实例
      */
-    public static ReActAgent build(ChatModelBase model, String userId) {
+    public static ReActAgent build(ChatModelBase model, String userId, StudioClient studioClient) {
         ClasspathSkillRepository skillRepo;
         try {
             skillRepo = new ClasspathSkillRepository("skills");
@@ -80,19 +83,19 @@ public class RouterAgentFactory {
 
             registerExpert(toolkit, "call_vehicle_agent",
                     "控制车辆设备：空调、车窗、座椅、车灯、车门",
-                    () -> VehicleAgent.build(model, skillRepo), userId, "vehicle");
+                    () -> VehicleAgent.build(model, skillRepo, studioClient), userId, "vehicle");
 
             registerExpert(toolkit, "call_music_agent",
                     "播放和控制音乐、调节音量、切换播放模式",
-                    () -> MusicAgent.build(model, skillRepo), userId, "music");
+                    () -> MusicAgent.build(model, skillRepo, studioClient), userId, "music");
 
             registerExpert(toolkit, "call_nav_agent",
                     "导航路线规划、添加途经点、修改目的地、搜索途中POI",
-                    () -> NavAgent.build(model, skillRepo), userId, "nav");
+                    () -> NavAgent.build(model, skillRepo, studioClient), userId, "nav");
 
             registerExpert(toolkit, "call_qa_agent",
                     "长安汽车车型问答及通用知识问答",
-                    () -> QAAgent.build(model, skillRepo), userId, "qa");
+                    () -> QAAgent.build(model, skillRepo, studioClient), userId, "qa");
 
             AutoContextMemory memory = new AutoContextMemory(
                     AutoContextConfig.builder()
@@ -102,13 +105,19 @@ public class RouterAgentFactory {
                             .build(),
                     model);
 
+            List<io.agentscope.core.hook.Hook> hooks = new java.util.ArrayList<>(
+                    List.of(new LoggingHook(), new CommandCaptureHook()));
+            if (studioClient != null) {
+                hooks.add(new StudioMessageHook(studioClient));
+            }
+
             return ReActAgent.builder()
                     .name("小安")
                     .sysPrompt(SYS_PROMPT)
                     .model(model)
                     .memory(memory)
                     .toolkit(toolkit)
-                    .hooks(List.of(new LoggingHook(), new CommandCaptureHook()))
+                    .hooks(hooks)
                     .build();
         } catch (Exception e) {
             try { skillRepo.close(); } catch (Exception ignored) {}

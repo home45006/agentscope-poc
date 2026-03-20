@@ -5,6 +5,9 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.model.ChatModelBase;
+import io.agentscope.core.studio.StudioClient;
+import io.agentscope.core.studio.StudioManager;
+import io.agentscope.core.studio.StudioUserAgent;
 import io.agentscope.poc.config.ModelConfig;
 import io.agentscope.poc.router.RouterAgentFactory;
 import io.agentscope.poc.util.AppLogger;
@@ -46,20 +49,95 @@ public class XiaoAnApplication {
         String provider = ModelConfig.currentProvider();
         AppLogger.logSystem("启动小安，模型提供商: " + provider);
 
-        String userId = "user_001";
-        ChatModelBase model = ModelConfig.buildModel();
-        ReActAgent xiaoAn = RouterAgentFactory.build(model, userId);
+        // 初始化 Studio（如果配置了 studio.url）
+        StudioClient studioClient = initStudio();
 
-        AppLogger.logSystem("小安 RouterAgent 初始化完成");
+        try {
+            String userId = "user_001";
+            ChatModelBase model = ModelConfig.buildModel();
+            ReActAgent xiaoAn = RouterAgentFactory.build(model, userId, studioClient);
 
-        if (args.length > 0 && "--interactive".equals(args[0])) {
-            runInteractiveMode(xiaoAn, userId);
-        } else {
-            runDemoMode(xiaoAn);
+            AppLogger.logSystem("小安 RouterAgent 初始化完成");
+
+            if (args.length > 0 && "--studio".equals(args[0])) {
+                runStudioMode(xiaoAn, studioClient);
+            } else if (args.length > 0 && "--interactive".equals(args[0])) {
+                runInteractiveMode(xiaoAn, userId);
+            } else {
+                runDemoMode(xiaoAn);
+            }
+
+            AppLogger.logSystem("小安会话结束");
+        } finally {
+            if (studioClient != null) {
+                StudioManager.shutdown();
+            }
+            Schedulers.shutdownNow();
+        }
+    }
+
+    private static StudioClient initStudio() {
+        if (!ModelConfig.isStudioEnabled()) {
+            return null;
+        }
+        String studioUrl = ModelConfig.loadStudioUrl();
+        try {
+            AppLogger.logSystem("连接 AgentScope Studio: " + studioUrl);
+            // tracingUrl：OTLP/HTTP 端点，Studio 默认与 studioUrl 相同（localhost:3000）
+            // 若 Studio 使用 gRPC 可改为 http://localhost:4317
+            String tracingUrl = ModelConfig.loadTracingUrl(studioUrl);
+            StudioManager.init()
+                    .studioUrl(studioUrl)
+                    .tracingUrl(tracingUrl)
+                    .project("小安-POC")
+                    .runName("xiao-an_" + System.currentTimeMillis())
+                    .initialize()
+                    .block();
+            AppLogger.logSystem("Studio 连接成功，打开 " + studioUrl + " 查看 Trace");
+            return StudioManager.getClient();
+        } catch (Exception e) {
+            AppLogger.logSystem("Studio 连接失败（已降级）: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static void runStudioMode(ReActAgent xiaoAn, StudioClient studioClient) {
+        if (studioClient == null) {
+            AppLogger.logSystem("Studio 未连接，降级为交互模式");
+            runInteractiveMode(xiaoAn, "user_001");
+            return;
         }
 
-        AppLogger.logSystem("小安会话结束");
-        Schedulers.shutdownNow();
+        StudioUserAgent user = StudioUserAgent.builder()
+                .name("用户")
+                .studioClient(StudioManager.getClient())
+                .webSocketClient(StudioManager.getWebSocketClient())
+                .build();
+
+        System.out.println("╔════════════════════════════════════════════╗");
+        System.out.println("║  小安 · Studio 模式已启动                 ║");
+        System.out.println("║  请打开 Studio Web UI 与小安对话           ║");
+        System.out.println("║  输入 exit 退出                            ║");
+        System.out.println("╚════════════════════════════════════════════╝");
+        System.out.println();
+
+        Msg msg = null;
+        while (true) {
+            msg = user.call(msg).block();
+            if (msg == null || "exit".equalsIgnoreCase(msg.getTextContent())) {
+                System.out.println("\n小安: 再见，随时为您服务！");
+                break;
+            }
+            AppLogger.logUserInput(msg.getTextContent());
+            // 用户消息来自 WebSocket，需显式推送到 Studio DataView
+            studioClient.pushMessage(msg).block();
+
+            msg = xiaoAn.call(msg).block();
+            // 代理回复由 StudioMessageHook（PostCallEvent）自动推送，无需重复 push
+            if (msg != null) {
+                AppLogger.logAgentOutput("小安", msg.getTextContent());
+            }
+        }
     }
 
     private static void runInteractiveMode(ReActAgent xiaoAn, String userId) {

@@ -5,6 +5,8 @@ import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
+import io.agentscope.core.studio.StudioClient;
+import io.agentscope.core.studio.StudioMessageHook;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.poc.tool.QATools;
 
@@ -27,7 +29,8 @@ public class QAAgent {
      * @return 配置好的 ReActAgent 实例
      */
     public static ReActAgent build(ChatModelBase model,
-                                   ClasspathSkillRepository skillRepo) {
+                                   ClasspathSkillRepository skillRepo,
+                                   StudioClient studioClient) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new QATools());
 
@@ -35,7 +38,7 @@ public class QAAgent {
         skillBox.registerSkill(skillRepo.getSkill("changan_knowledge"));
         skillBox.registerSkill(skillRepo.getSkill("general_qa"));
 
-        return ReActAgent.builder()
+        ReActAgent.Builder builder = ReActAgent.builder()
                 .name("小安·问答")
                 .sysPrompt("""
                         你是小安的知识模块，隶属于长安汽车。
@@ -45,7 +48,12 @@ public class QAAgent {
                 .model(model)
                 .toolkit(toolkit)
                 .skillBox(skillBox)
-                .memory(new InMemoryMemory())
-                .build();
+                .memory(new InMemoryMemory());
+
+        if (studioClient != null) {
+            builder.hook(new StudioMessageHook(studioClient));
+        }
+
+        return builder.build();
     }
 }

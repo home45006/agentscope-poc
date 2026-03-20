@@ -6,6 +6,8 @@ import io.agentscope.core.model.ChatModelBase;
 import io.agentscope.core.skill.AgentSkill;
 import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
+import io.agentscope.core.studio.StudioClient;
+import io.agentscope.core.studio.StudioMessageHook;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.poc.tool.MusicTools;
 
@@ -28,7 +30,8 @@ public class MusicAgent {
      * @return 配置好的 ReActAgent 实例
      */
     public static ReActAgent build(ChatModelBase model,
-                                   ClasspathSkillRepository skillRepo) {
+                                   ClasspathSkillRepository skillRepo,
+                                   StudioClient studioClient) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new MusicTools());
 
@@ -36,7 +39,7 @@ public class MusicAgent {
         AgentSkill skill = skillRepo.getSkill("music_playback");
         skillBox.registerSkill(skill);
 
-        return ReActAgent.builder()
+        ReActAgent.Builder builder = ReActAgent.builder()
                 .name("小安·音乐")
                 .sysPrompt("""
                         你是小安的音乐模块，隶属于长安汽车。
@@ -46,7 +49,12 @@ public class MusicAgent {
                 .model(model)
                 .toolkit(toolkit)
                 .skillBox(skillBox)
-                .memory(new InMemoryMemory())
-                .build();
+                .memory(new InMemoryMemory());
+
+        if (studioClient != null) {
+            builder.hook(new StudioMessageHook(studioClient));
+        }
+
+        return builder.build();
     }
 }

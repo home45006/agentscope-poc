@@ -25,3 +25,17 @@ glm.model.name=glm-4-flash
 # 使用 OpenAI 兼容接口: https://api.minimax.chat/v1
 minimax.api.key=your-minimax-api-key
 minimax.model.name=abab6.5s-chat
+
+# ============================================================
+# AgentScope Studio（可视化调试，默认关闭）
+# 开启步骤：
+#   1. 将 studio.enabled 设为 true
+#   2. 填写 studio.url
+#   3. 启动 Studio 服务: npm install -g @agentscope/studio && as_studio
+# ============================================================
+studio.enabled=false
+studio.url=http://localhost:3000
+# OTLP Trace 上报端点（留空则与 studio.url 相同）
+# Studio 同时提供 OTLP/HTTP（:3000）和 OTLP/gRPC（:4317）
+# 若需要使用 gRPC：studio.tracing.url=http://localhost:4317
+studio.tracing.url=

@@ -83,6 +83,42 @@ public class ModelConfig {
         return loadProperties().getProperty("model.provider", "dashscope").trim().toLowerCase();
     }
 
+    /**
+     * 判断是否启用 AgentScope Studio。
+     * 需同时满足：studio.enabled=true 且 studio.url 不为空。
+     */
+    public static boolean isStudioEnabled() {
+        Properties props = loadProperties();
+        String enabled = props.getProperty("studio.enabled", "false").trim();
+        if (!Boolean.parseBoolean(enabled)) {
+            return false;
+        }
+        String url = props.getProperty("studio.url", "").trim();
+        return !url.isBlank();
+    }
+
+    /**
+     * 加载 Studio 地址配置。
+     *
+     * @return Studio URL，未配置或为空时返回 null
+     */
+    public static String loadStudioUrl() {
+        String url = loadProperties().getProperty("studio.url", "").trim();
+        return url.isBlank() ? null : url;
+    }
+
+    /**
+     * 加载 OTLP Tracing 端点地址。
+     * 未单独配置时默认与 studioUrl 相同（Studio 在同一端口同时提供 OTLP/HTTP 服务）。
+     *
+     * @param defaultUrl studioUrl 作为默认值
+     * @return Tracing URL
+     */
+    public static String loadTracingUrl(String defaultUrl) {
+        String url = loadProperties().getProperty("studio.tracing.url", "").trim();
+        return url.isBlank() ? defaultUrl : url;
+    }
+
     // ──────────────────────────────────────────────────
     // 各 Provider 构建逻辑
     // ──────────────────────────────────────────────────
